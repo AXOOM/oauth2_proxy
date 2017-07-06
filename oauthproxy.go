@@ -290,8 +290,8 @@ func (p *OAuthProxy) MakeSessionCookie(req *http.Request, value string, expirati
 }
 
 // MakeCSRFCookie creates a cookie for CSRF
-func (p *OAuthProxy) MakeCSRFCookie(req *http.Request, value string, expiration time.Duration, now time.Time) *http.Cookie {
-	return p.makeCookie(req, p.CSRFCookieName, value, expiration, now)
+func (p *OAuthProxy) MakeCSRFCookie(req *http.Request, nonce string, expiration time.Duration, now time.Time) *http.Cookie {
+	return p.makeCookie(req, p.CSRFCookieName + "." + nonce, nonce, expiration, now)
 }
 
 func (p *OAuthProxy) makeCookie(req *http.Request, name string, value string, expiration time.Duration, now time.Time) *http.Cookie {
@@ -318,13 +318,13 @@ func (p *OAuthProxy) makeCookie(req *http.Request, name string, value string, ex
 
 // ClearCSRFCookie creates a cookie to unset the CSRF cookie stored in the user's
 // session
-func (p *OAuthProxy) ClearCSRFCookie(rw http.ResponseWriter, req *http.Request) {
-	http.SetCookie(rw, p.MakeCSRFCookie(req, "", time.Hour*-1, time.Now()))
+func (p *OAuthProxy) ClearCSRFCookie(rw http.ResponseWriter, req *http.Request, nonce string) {
+	http.SetCookie(rw, p.MakeCSRFCookie(req, nonce, time.Hour*-1, time.Now()))
 }
 
 // SetCSRFCookie adds a CSRF cookie to the response
-func (p *OAuthProxy) SetCSRFCookie(rw http.ResponseWriter, req *http.Request, val string) {
-	http.SetCookie(rw, p.MakeCSRFCookie(req, val, p.CookieExpire, time.Now()))
+func (p *OAuthProxy) SetCSRFCookie(rw http.ResponseWriter, req *http.Request, nonce string) {
+	http.SetCookie(rw, p.MakeCSRFCookie(req, nonce, p.CookieExpire, time.Now()))
 }
 
 // ClearSessionCookie creates a cookie to unset the user's authentication cookie
@@ -597,12 +597,12 @@ func (p *OAuthProxy) OAuthCallback(rw http.ResponseWriter, req *http.Request) {
 	}
 	nonce := s[0]
 	redirect := s[1]
-	c, err := req.Cookie(p.CSRFCookieName)
+	c, err := req.Cookie(p.CSRFCookieName + "." + nonce)
 	if err != nil {
 		p.ErrorPage(rw, 403, "Permission Denied", err.Error())
 		return
 	}
-	p.ClearCSRFCookie(rw, req)
+	p.ClearCSRFCookie(rw, req, nonce)
 	if c.Value != nonce {
 		log.Printf("%s csrf token mismatch, potential attack", remoteAddr)
 		p.ErrorPage(rw, 403, "Permission Denied", "csrf failed")
